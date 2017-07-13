@@ -1,8 +1,18 @@
-# This is a mapping analysis script for constrained mapping.#
+# This is a mapping analysis script for constrained mapping.
 import copy
 import re
 
-# Load the neural connection groups.#
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load the neural connection groups.
+# This procedure generates a list of connection groups.
+# Indexed by Connection Group ID
+# IDs of Neural Nodes are listed in each item
+
+TDM_DELAY_UNIT = 1
+SWITCH_DELAY_UNIT = 5
+SWITCH_POWER_UNIT = 2
 
 connection_file = open('connection-group.conf', mode='r')
 connection_str = connection_file.read()
@@ -19,7 +29,11 @@ print(connection_group_list)
 
 connection_file.close()
 
-# Load the architectural connections. #
+# Load the architectural connections.
+# This procedure generated bus connection.
+# Indexed by Bus ID
+# Computational Nodes connected to the bus are listed
+# in each item from left to right#
 
 bus_file = open('bus-arch.conf', mode='r')
 bus_str = bus_file.read()
@@ -36,7 +50,11 @@ print(bus_list)
 
 bus_file.close()
 
-# Compute the mappable list and switch occupation. #
+# Compute the mappable list and switch occupation.
+# This generates the mappable bus list of each neural node.
+# Indexed by Connection Group ID.
+# All the mappable buses are listed in the item as Bus ID.
+# Switch occupation is corresponding to the mapping#
 
 mappable_list = []
 switch_occupation = []
@@ -65,9 +83,12 @@ print("Switch occupation for each mapping:")
 print(switch_occupation)
 
 
-# Compute all the possible mappings. #
-# There is a hint for the following students. #
-# When doing list operations, #
+# Compute all the possible mappings.
+# Each item of the generated list is also a list
+# The list is indexed by Connection Group ID
+# And the item is the mapped Bus ID
+# There is a hint for the following students.
+# When doing list operations,
 # please distinguish "=" and "copy.copy(a)! "
 
 mapping_list = []
@@ -87,28 +108,78 @@ print("All possible mappings, indexed by communication group ID"
       " and contented by bus ID: ")
 print(mapping_list)
 
+# Generate the TDM number.
+# Each item is also a list corresponding to Mapping List
+# Items are indexed by Connection Group ID
+# the number is anticipated TDM count #
+tdm_number_list = []
+for mapping_item in mapping_list:
+    tdm_number_item = []
+    for con_id in range(len(mapping_item)):
+        tdm_count = 0
+        bus_id = mapping_item[con_id]
+        for i in mapping_item:
+            if i == bus_id:
+                temp_con_id = mapping_item.index(i)
+                if len(set(connection_group_list[temp_con_id]) &
+                       set(connection_group_list[con_id])) != 0:
+                    tdm_count += 1
+        tdm_count = tdm_count - 1
+        tdm_number_item.append(tdm_count)
+    tdm_number_list.append(tdm_number_item)
+
+print('TDM table:')
+print(tdm_number_list)
+
 
 # Compute the delay and power consumption of each mapping. #
+power_consumption_list = []
+delay_list = []
 for mapping_item in mapping_list:
     mapping_switch_delay_dict = {}
-    mapping_switch_delay = 0
+    total_delay = 0
     mapping_switch_occupation = 0
     for con_id in range(len(mapping_item)):
         bus_id = mapping_item[con_id]
-        # print(switch_occupation[con_id][mappable_list[con_id].index(bus_id)])
         occupation_temp = switch_occupation[con_id][mappable_list[con_id].index(bus_id)]
+
+        # The number of connection group mapped on the bus
+        # will affect the number of TDM
+        tdm_factor = len(mapping_item) - len(set(mapping_item))
+        tdm_delay_temp = tdm_number_list[mapping_list.index(mapping_item)][con_id]\
+                         * tdm_factor
+        delay_temp = occupation_temp*SWITCH_DELAY_UNIT + tdm_delay_temp*TDM_DELAY_UNIT
         if bus_id in mapping_switch_delay_dict:
-            if occupation_temp > mapping_switch_delay_dict[bus_id]:
-                mapping_switch_delay_dict[bus_id] = occupation_temp
+            if delay_temp > mapping_switch_delay_dict[bus_id]:
+                mapping_switch_delay_dict[bus_id] = delay_temp
         else:
-            mapping_switch_delay_dict[bus_id] = occupation_temp
+            mapping_switch_delay_dict[bus_id] = delay_temp
         mapping_switch_occupation += occupation_temp
-    tdm_number = len(mapping_item) - len(set(mapping_item))
+    # tdm_number = len(mapping_item) - len(set(mapping_item))
+    power_consumption = mapping_switch_occupation * SWITCH_POWER_UNIT
     for i in mapping_switch_delay_dict:
-        mapping_switch_delay += mapping_switch_delay_dict[i]
+        total_delay += mapping_switch_delay_dict[i]
     print("Info for mapping %d" % mapping_list.index(mapping_item))
-    print("Power consumption: %d" % mapping_switch_occupation)
-    print("TDM: %d" % tdm_number)
-    print("Switch occupation %d" % mapping_switch_delay)
-    print(mapping_switch_delay_dict)
-    
+    print("Power consumption: %d" % power_consumption)
+    print("Anticipated delay: %d" % total_delay)
+    power_consumption_list.append(power_consumption)
+    delay_list.append(total_delay)
+
+
+# Plotting the result with scatter figure
+x = np.array(delay_list)
+y = np.array(power_consumption_list)
+dot_label = {}
+plt.scatter(x, y)
+plt.xlabel('Delay (clock cycles)')
+plt.ylabel('Power consumption (energy unit)')
+for i in range(len(delay_list)):
+    if (x[i], y[i]) not in dot_label:
+        dot_label[(x[i], y[i])] = str(i)
+    else:
+        dot_label[(x[i], y[i])] = dot_label[(x[i], y[i])]\
+                                  + ', ' + str(i)
+    for dot in dot_label:
+        plt.annotate(dot_label[dot], dot)
+plt.show()
+
