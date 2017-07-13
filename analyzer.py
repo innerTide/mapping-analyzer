@@ -145,9 +145,8 @@ for mapping_item in mapping_list:
 
         # The number of connection group mapped on the bus
         # will affect the number of TDM
-        tdm_factor = len(mapping_item) - len(set(mapping_item))
-        tdm_delay_temp = tdm_number_list[mapping_list.index(mapping_item)][con_id]\
-                         * tdm_factor
+        # tdm_factor = len(mapping_item) - len(set(mapping_item))
+        tdm_delay_temp = tdm_number_list[mapping_list.index(mapping_item)][con_id] ** 2
         delay_temp = occupation_temp*SWITCH_DELAY_UNIT + tdm_delay_temp*TDM_DELAY_UNIT
         if bus_id in mapping_switch_delay_dict:
             if delay_temp > mapping_switch_delay_dict[bus_id]:
