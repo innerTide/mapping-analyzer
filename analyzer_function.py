@@ -12,7 +12,7 @@ TDM_DELAY_UNIT = 5
 SWITCH_DELAY_UNIT = 1
 SWITCH_POWER_UNIT = 1
 SWITCH_AREA_UNIT = 1
-MODE = 'avg'
+MODE = 'max'
 VERBOSE = False
 
 
@@ -127,13 +127,21 @@ def calculation(connection_file_name, bus_file_name):
         for con_id in range(len(mapping_item)):
             tdm_count = 0
             bus_id = mapping_item[con_id]
-            for mapping_item_i in mapping_item:
-                if mapping_item_i == bus_id:
-                    temp_con_id = mapping_item.index(mapping_item_i)
-                    if len(set(connection_group_list[temp_con_id]) &
-                                   set(connection_group_list[con_id])) != 0:
+            # Begin to calculate the placement of the connection group on bus
+            current_placement = []
+            for node_id in connection_group_list[con_id]:
+                current_placement.append(bus_list[bus_id].index(node_id))
+            # Calculate the range of placement
+            current_placement_range = range(min(current_placement), max(current_placement))
+            for temp_con_id, temp_bus_id in enumerate(mapping_item):
+                if temp_bus_id == bus_id:
+                    temp_placement = []
+                    for temp_node_id in connection_group_list[temp_con_id]:
+                        temp_placement.append(bus_list[temp_bus_id].index(temp_node_id))
+                    temp_placement_range = range(min(temp_placement), max(temp_placement))
+                    if len(set(current_placement_range) & set(temp_placement_range)) != 0:
                         tdm_count += 1
-            tdm_count = tdm_count
+            tdm_count = tdm_count - 1
             tdm_number_item.append(tdm_count)
         tdm_number_list.append(tdm_number_item)
 
@@ -200,7 +208,7 @@ def calculation(connection_file_name, bus_file_name):
 
         if VERBOSE:
             print("Info for mapping %d" % mapping_list.index(mapping_item))
-            print("Power consumption: %d" % power_consumption)
+            print("Energy consumption: %d" % power_consumption)
             print("Computed delay: %f" % computed_delay)
             print("Switch usage: %d" % switch_usage)
         power_consumption_list.append(power_consumption)
@@ -214,9 +222,10 @@ def calculation(connection_file_name, bus_file_name):
 
 # Plotting the result with scatter figure
 main_window = tkinter.Tk()
-# main_window.withdraw()
+main_window.withdraw()
 connection_group_file_name = tkinter.filedialog.askopenfilename(title='Connection group file', initialdir='.')
 bus_file_list = list(tkinter.filedialog.askopenfilenames(title='Bus architecture file(s)', initialdir='.'))
+bus_file_list.sort()
 print(bus_file_list)
 
 if connection_group_file_name == '' or bus_file_list == []:
@@ -239,14 +248,31 @@ size_list = [20, 17, 14, 11, 8]
 x = []
 y = []
 z = []
+x_list = []
+y_list = []
+z_list = []
 # fig_size = matplotlib.pyplot.gcf()
 # fig_size.set_size_inches(50, 50)
 fig = plt.figure(0)
 for i, file_name in enumerate(bus_file_list):
     x, y, z = calculation(connection_group_file_name, file_name)
+
+    print("Mapping statistics for %s." % file_name)
+
+    print("Minimum latency: latency: %d, energy: %d, area: %d." %
+          (min(x), y[x.index(min(x))], z[x.index(min(x))]))
+    print("Minimum energy: latency: %d, energy: %d, area: %d." %
+          (x[y.index(min(y))], min(y), z[y.index(min(y))]))
+    print("Minimum area: latency: %d, energy: %d, area: %d." %
+          (x[z.index(min(z))], y[z.index(min(z))], min(z)))
+    print()
+
+    x_list.append(x)
+    y_list.append(y)
+    z_list.append(z)
     plt.subplot(121)
-    plt.xlabel('Delay (time unit)')
-    plt.ylabel('Power consumption (power unit)')
+    plt.xlabel('Latency (time unit)')
+    plt.ylabel('Energy consumption (energy unit)')
 
     x = np.array(x)
     y = np.array(y)
@@ -257,7 +283,7 @@ for i, file_name in enumerate(bus_file_list):
     plt.subplot(122)
     z = np.array(z)
     plt.xlabel('Area (square unit)')
-    plt.ylabel('Power consumption (time unit)')
+    plt.ylabel('Energy consumption (energy unit)')
     plt.scatter(z, y, marker=symbol_list[i], color=color_list[i],
                 label='Arch ' + str(i), s=size_list[i])
     plt.legend(loc='upper right')
@@ -282,10 +308,11 @@ plt.show()
 fig_3d = plt.figure(1)
 ax = fig_3d.add_subplot(111, projection='3d')
 for i, file_name in enumerate(bus_file_list):
-    ax.scatter(x, y, z, c=color_list[i], marker=symbol_list[i], s=size_list[i])
+    ax.scatter(x_list[i], y_list[i], z_list[i],
+               c=color_list[i], marker=symbol_list[i], s=size_list[i])
 
-ax.set_xlabel('Delay (time unit)')
-ax.set_ylabel('Power consumption (power unit)')
+ax.set_xlabel('Latency (time unit)')
+ax.set_ylabel('Energy consumption (energy unit)')
 ax.set_zlabel('Area (square unit)')
 
 plt.savefig('result_3d_' + MODE, dpi=600)
