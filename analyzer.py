@@ -135,6 +135,8 @@ print(tdm_number_list)
 # Compute the delay and power consumption of each mapping. #
 power_consumption_list = []
 delay_list = []
+total_tdm_list = []
+max_delay_list = []
 for mapping_item in mapping_list:
     mapping_switch_delay_dict = {}
     total_delay = 0
@@ -156,29 +158,50 @@ for mapping_item in mapping_list:
         mapping_switch_occupation += occupation_temp
     # tdm_number = len(mapping_item) - len(set(mapping_item))
     power_consumption = mapping_switch_occupation * SWITCH_POWER_UNIT
+    max_delay = 0
     for i in mapping_switch_delay_dict:
         total_delay += mapping_switch_delay_dict[i]
+        if mapping_switch_delay_dict[i] > max_delay:
+            max_delay = mapping_switch_delay_dict[i]
     print("Info for mapping %d" % mapping_list.index(mapping_item))
     print("Power consumption: %d" % power_consumption)
     print("Anticipated delay: %d" % total_delay)
     power_consumption_list.append(power_consumption)
     delay_list.append(total_delay)
+    max_delay_list.append(max_delay)
 
+for tdm_number_item in tdm_number_list:
+    total_tdm_list.append(max(tdm_number_item))
 
 # Plotting the result with scatter figure
 x = np.array(delay_list)
 y = np.array(power_consumption_list)
+z = np.array(total_tdm_list)
+a = np.array(max_delay_list)
 dot_label = {}
 plt.scatter(x, y)
 plt.xlabel('Delay (clock cycles)')
 plt.ylabel('Power consumption (energy unit)')
-for i in range(len(delay_list)):
+for i in range(len(power_consumption_list)):
     if (x[i], y[i]) not in dot_label:
         dot_label[(x[i], y[i])] = str(i)
     else:
         dot_label[(x[i], y[i])] = dot_label[(x[i], y[i])]\
                                   + ', ' + str(i)
-    for dot in dot_label:
-        plt.annotate(dot_label[dot], dot)
+for dot in dot_label:
+    plt.annotate(dot_label[dot], dot)
 plt.show()
 
+tdm_label = {}
+plt.scatter(z, y)
+plt.xlabel('Total TDM count')
+plt.ylabel('Power consumption (energy unit)')
+for i in range(len(power_consumption_list)):
+    if (z[i], y[i]) not in tdm_label:
+        tdm_label[(z[i], y[i])] = str(i)
+    else:
+        tdm_label[(z[i], y[i])] = tdm_label[(z[i], y[i])] \
+                                  + ', ' + str(i)
+for tdm_dot in tdm_label:
+    plt.annotate(tdm_label[tdm_dot], tdm_dot)
+plt.show()
